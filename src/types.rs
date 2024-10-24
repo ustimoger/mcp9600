@@ -23,11 +23,11 @@ impl Temperature {
 }
 
 #[inline]
-fn convert_temperature(buffer: RawTemperature) -> f32 {
-    let sign = buffer.msb.view_bits::<Lsb0>()[0];
+ fn convert_temperature(buffer: RawTemperature) -> f32 {
+    let sign = buffer.msb.view_bits::<Lsb0>()[7];
     match sign {
-        true => buffer.msb as f32 * 16.0 + buffer.lsb as f32 / 16.0,
-        false => (buffer.msb as f32 * 16.0 + buffer.lsb as f32 / 16.0) - 4096.0,
+        false => buffer.msb as f32 * 16.0 + buffer.lsb as f32 / 16.0,
+        true => (buffer.msb as f32 * 16.0 + buffer.lsb as f32 / 16.0) - 4096.0,
     }
 }
 
