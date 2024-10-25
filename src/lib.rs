@@ -3,6 +3,7 @@
 
 mod types;
 
+use bitvec::{array::BitArray, bitarr, order::Lsb0, view::{BitView, BitViewSized}};
 //use bitvec::prelude::*;
 use embedded_hal::blocking::i2c;
 
@@ -35,6 +36,27 @@ where
         // This should return 64 for the MCP9600 and 65 for the MCP9601
     }
 
+    pub fn read_status_register(&mut self)->Result<Status,E>{
+        let mut data = [0u8]; 
+        self.i2c.write_read(self.address as u8, &[Register::Status as u8], &mut data)?; 
+        let data:BitArray<u8,Lsb0> =  data[0].into_bitarray() ; 
+        
+        Ok(Status { alert_1: data[0], alert_2: data[1], alert_3: data[2], alert_4: data[3], input_range: data[4], short_circut: data[5], th_update: data[6], burst_complete: data[7] })
+    }
+    
+    
+    //Reads Alerts temperature
+    pub fn read_alert_register(&mut self, alert: Alert)->Result<f32,E>{
+        let mut data = [0u8, 0u8]; 
+        self.i2c.write_read(self.address as u8, &[(Register::Alert1Configuration as u8)| (alert as u8)], &mut data)?; 
+        Ok(convert_alert_temperature(data))
+    }
+    ///Sets Alert Temperature  
+    pub fn set_alert_register(&mut self, alert: Alert, value: [u8;2])->Result<(),E>{
+        self.i2c
+        .write(self.address as u8, &[Register::Alert1Configuration as u8 | alert as u8, value[0], value[1]])
+        
+    }
     /// Writes into a register
     #[allow(unused)]
     fn write_register(&mut self, register: Register, value: u8) -> Result<(), E> {
@@ -120,7 +142,9 @@ where
             &[Register::SensorConfiguration as u8, configuration],
         )
     }
-
+    pub fn set_alert_configuration(){
+        
+    }
     /// Sets the device configuration. Requires a cold junction resolution
     /// ADC resolution, burst mode samples (even if not using burst mode),
     /// and shutdown mode.
@@ -142,6 +166,14 @@ where
             &[Register::DeviceConfiguration as u8, configuration],
         )
     }
+}
+fn convert_alert_temperature(buffer: [u8; 2])->f32{
+    let sign = buffer[0].view_bits::<Lsb0>()[7]; 
+    match sign{
+        false => buffer[0] as f32 *16.0 + buffer[1] as f32 / 16.0, 
+        true => (buffer[0] as f32 * 16.0 + buffer[1] as f32 / 16.0) - 4096.0,
+    }
+
 }
 
 impl Register {
@@ -197,7 +229,13 @@ pub enum Register {
     Alert4Limit = 0b0001_0011,
     DeviceID = 0b0010_0000, // Should contain the device ID
 }
-
+#[derive(Clone, Copy)]
+pub enum Alert{
+    ONE = 0b0000_0000, 
+    TWO = 0b0000_0001,
+    THREE = 0b0000_0010,
+    FOUR = 0b0000_0011, //Don't know if seperate functions or this is better
+}
 #[derive(Clone, Copy)]
 pub enum ThermocoupleType {
     // Rather than mess around with constructing a bit vector, lets just make this a logical

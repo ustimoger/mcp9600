@@ -2,6 +2,17 @@ use bitvec::prelude::*;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Temperature(pub f32);
+pub struct Status{
+    pub alert_1: bool, 
+    pub alert_2: bool, 
+    pub alert_3: bool, 
+    pub alert_4: bool, 
+    pub input_range : bool, 
+    pub short_circut : bool, 
+    pub th_update: bool, 
+    pub burst_complete: bool,
+
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawTemperature {
@@ -23,13 +34,14 @@ impl Temperature {
 }
 
 #[inline]
-fn convert_temperature(buffer: RawTemperature) -> f32 {
-    let sign = buffer.msb.view_bits::<Lsb0>()[0];
+ fn convert_temperature(buffer: RawTemperature) -> f32 {
+    let sign = buffer.msb.view_bits::<Lsb0>()[7];
     match sign {
-        true => buffer.msb as f32 * 16.0 + buffer.lsb as f32 / 16.0,
-        false => (buffer.msb as f32 * 16.0 + buffer.lsb as f32 / 16.0) - 4096.0,
+        false => buffer.msb as f32 * 16.0 + buffer.lsb as f32 / 16.0,
+        true => (buffer.msb as f32 * 16.0 + buffer.lsb as f32 / 16.0) - 4096.0,
     }
 }
+
 
 // TODO: need to fix testing because of the weird behavior of the sign bit
 #[cfg(test)]
@@ -54,6 +66,7 @@ mod tests {
         let temperature = convert_temperature(data);
         assert_eq!(temperature, -197.1875);
     }
+
     #[test]
     fn test_from_raw() {
         let raw = RawTemperature {
